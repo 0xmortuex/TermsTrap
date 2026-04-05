@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TermsTrap — What are you actually agreeing to?</title>
+  <meta name="description" content="Paste any Terms of Service and instantly see what you're really signing up for. AI highlights data selling, forced arbitration, auto-renewals, and every clause companies hope you won't read.">
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/report.css">
+  <link rel="stylesheet" href="css/modal.css">
+</head>
+<body>
+  <!-- ===== INPUT VIEW ===== -->
+  <div id="input-view" class="view active">
+    <div class="input-container">
+      <div class="logo-section">
+        <div class="logo">
+          <svg class="logo-icon" viewBox="0 0 64 64" width="40" height="40">
+            <polygon points="32,4 60,56 4,56" fill="none" stroke="#f43f5e" stroke-width="4" stroke-linejoin="round"/>
+            <ellipse cx="32" cy="36" rx="8" ry="10" fill="none" stroke="#f43f5e" stroke-width="3"/>
+            <circle cx="32" cy="36" r="3.5" fill="#f43f5e"/>
+            <line x1="32" y1="22" x2="32" y2="26" stroke="#f43f5e" stroke-width="3" stroke-linecap="round"/>
+          </svg>
+          <h1 class="logo-text">Terms<span class="logo-accent">Trap</span></h1>
+        </div>
+        <p class="tagline">What are you actually agreeing to?</p>
+      </div>
+
+      <div class="textarea-wrapper">
+        <textarea id="tos-input" placeholder="Paste any Terms of Service, Privacy Policy, or EULA..." spellcheck="false"></textarea>
+        <div id="scan-line" class="scan-line hidden"></div>
+      </div>
+
+      <div id="loading-info" class="loading-info hidden">
+        <span class="loading-text">Reading the fine print...</span>
+        <span class="loading-subtext">This takes 15-25 seconds</span>
+        <span id="elapsed-timer" class="elapsed-timer">0s</span>
+      </div>
+
+      <div class="buttons-row">
+        <button id="btn-scan" class="btn btn-primary">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+          Scan Terms
+        </button>
+        <button id="btn-sample" class="btn btn-secondary">Load Sample</button>
+      </div>
+
+      <div class="example-chips">
+        <span class="chip-label">Try:</span>
+        <button class="chip" data-sample="socialbuzz">SocialBuzz ToS</button>
+        <button class="chip" data-sample="cloudvault">CloudVault Pro ToS</button>
+        <button class="chip" data-sample="quicklend">QuickLend ToS</button>
+      </div>
+
+      <div class="shortcut-hint">Ctrl+Enter to scan</div>
+    </div>
+  </div>
+
+  <!-- ===== REPORT VIEW ===== -->
+  <div id="report-view" class="view">
+    <header class="report-header">
+      <div class="header-left">
+        <button id="btn-back-logo" class="logo-btn">
+          <svg class="logo-icon-sm" viewBox="0 0 64 64" width="24" height="24">
+            <polygon points="32,4 60,56 4,56" fill="none" stroke="#f43f5e" stroke-width="4" stroke-linejoin="round"/>
+            <ellipse cx="32" cy="36" rx="8" ry="10" fill="none" stroke="#f43f5e" stroke-width="3"/>
+            <circle cx="32" cy="36" r="3.5" fill="#f43f5e"/>
+          </svg>
+          <span class="header-logo-text">Terms<span class="logo-accent">Trap</span></span>
+        </button>
+      </div>
+      <div class="header-center">
+        <span id="company-name" class="company-name"></span>
+        <span id="doc-type-badge" class="doc-type-badge"></span>
+      </div>
+      <div class="header-right">
+        <button id="btn-scan-new" class="btn btn-sm btn-secondary">Scan New</button>
+        <button id="btn-share" class="btn btn-sm btn-primary">Share Results</button>
+      </div>
+    </header>
+
+    <main class="report-content">
+      <!-- Risk Score Hero -->
+      <section class="risk-hero">
+        <div class="risk-score-container">
+          <svg class="risk-ring" viewBox="0 0 160 160">
+            <circle cx="80" cy="80" r="70" fill="none" stroke="var(--border)" stroke-width="8"/>
+            <circle id="risk-ring-progress" cx="80" cy="80" r="70" fill="none" stroke-width="8" stroke-linecap="round"
+              stroke-dasharray="439.82" stroke-dashoffset="439.82" transform="rotate(-90 80 80)"/>
+          </svg>
+          <div class="risk-score-number">
+            <span id="risk-score-value">0</span>
+          </div>
+        </div>
+        <div id="risk-level-label" class="risk-level-label"></div>
+        <div id="reading-time" class="reading-time"></div>
+        <div class="tldr-card">
+          <div class="tldr-label">TL;DR</div>
+          <p id="tldr-text" class="tldr-text"></p>
+        </div>
+      </section>
+
+      <!-- Grade Breakdown -->
+      <section class="grades-section">
+        <div class="grades-row" id="grades-row"></div>
+      </section>
+
+      <!-- Traps Section -->
+      <section class="traps-section">
+        <div class="traps-header">
+          <h2 class="traps-title">What They're Hiding</h2>
+          <span id="trap-count" class="trap-count-badge"></span>
+        </div>
+        <div class="filter-row">
+          <div class="severity-filters" id="severity-filters">
+            <button class="filter-pill active" data-severity="all">All</button>
+            <button class="filter-pill" data-severity="critical">Critical</button>
+            <button class="filter-pill" data-severity="high">High</button>
+            <button class="filter-pill" data-severity="medium">Medium</button>
+            <button class="filter-pill" data-severity="low">Low</button>
+          </div>
+        </div>
+        <div class="filter-row">
+          <div class="category-filters" id="category-filters"></div>
+        </div>
+        <div id="traps-list" class="traps-list"></div>
+      </section>
+
+      <!-- Good Clauses -->
+      <section class="good-section">
+        <button class="good-toggle" id="good-toggle">
+          <span class="good-title">What They Got Right</span>
+          <span id="good-count" class="good-count"></span>
+          <svg class="chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div id="good-list" class="good-list collapsed"></div>
+      </section>
+
+      <!-- Comparisons -->
+      <section class="comparisons-section" id="comparisons-section">
+        <div class="comparisons-card">
+          <div class="comparison-col">
+            <h3 class="comparison-heading comparison-better">Better than...</h3>
+            <ul id="worse-companies" class="comparison-list"></ul>
+          </div>
+          <div class="comparison-divider"></div>
+          <div class="comparison-col">
+            <h3 class="comparison-heading comparison-worse">Worse than...</h3>
+            <ul id="better-companies" class="comparison-list"></ul>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Floating Actions -->
+    <div class="fab-group">
+      <button id="fab-new" class="fab" title="New Scan">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
+      <button id="fab-copy" class="fab" title="Copy Report">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== TRAP DETAIL MODAL ===== -->
+  <div id="trap-modal" class="modal-backdrop hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-badges">
+          <span id="modal-category-badge" class="category-badge"></span>
+          <span id="modal-severity-badge" class="severity-badge"></span>
+        </div>
+        <button id="modal-close" class="modal-close">&times;</button>
+      </div>
+      <h2 id="modal-title" class="modal-title"></h2>
+      <div id="modal-quote" class="modal-quote"></div>
+      <div id="modal-body" class="modal-body">
+        <div class="modal-loading">
+          <div class="spinner"></div>
+          <span>Loading deep analysis...</span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="modal-copy" class="btn btn-sm btn-secondary">Copy Analysis</button>
+        <button id="modal-close-btn" class="btn btn-sm btn-primary">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SHARE MODAL ===== -->
+  <div id="share-modal" class="modal-backdrop hidden">
+    <div class="modal modal-share">
+      <div class="modal-header">
+        <h2 class="modal-title" style="margin:0">Share Results</h2>
+        <button id="share-close" class="modal-close">&times;</button>
+      </div>
+      <div id="share-card-wrapper" class="share-card-wrapper">
+        <div id="share-card" class="share-card">
+          <div class="share-card-header">
+            <div class="share-logo">Terms<span class="logo-accent">Trap</span></div>
+            <div class="share-company" id="share-company"></div>
+          </div>
+          <div class="share-score-section">
+            <svg class="share-ring" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="52" fill="none" stroke="#1e293b" stroke-width="6"/>
+              <circle id="share-ring-progress" cx="60" cy="60" r="52" fill="none" stroke-width="6" stroke-linecap="round"
+                stroke-dasharray="326.73" stroke-dashoffset="326.73" transform="rotate(-90 60 60)"/>
+            </svg>
+            <span id="share-score" class="share-score-num"></span>
+          </div>
+          <div id="share-risk-label" class="share-risk-label"></div>
+          <div id="share-tldr" class="share-tldr"></div>
+          <div id="share-grades" class="share-grades"></div>
+          <div id="share-top-traps" class="share-top-traps"></div>
+          <div class="share-watermark">Scanned with TermsTrap</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="share-copy-text" class="btn btn-sm btn-secondary">Copy as Text</button>
+        <button id="share-download" class="btn btn-sm btn-primary">Download as PNG</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

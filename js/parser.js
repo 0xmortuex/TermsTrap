@@ -2,7 +2,11 @@ export function parseAnalysis(raw) {
   let data;
   if (typeof raw === 'string') {
     const cleaned = raw.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
-    data = JSON.parse(cleaned);
+    try {
+      data = JSON.parse(cleaned);
+    } catch {
+      throw new Error("Couldn't parse the analysis result — the document may be too long and got cut off. Try a shorter excerpt.");
+    }
   } else {
     data = raw;
   }
@@ -29,7 +33,11 @@ export function parseDetail(raw) {
   let data;
   if (typeof raw === 'string') {
     const cleaned = raw.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
-    data = JSON.parse(cleaned);
+    try {
+      data = JSON.parse(cleaned);
+    } catch {
+      throw new Error("Couldn't parse the deep analysis result. Please try again.");
+    }
   } else {
     data = raw;
   }

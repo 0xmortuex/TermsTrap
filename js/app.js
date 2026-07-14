@@ -27,11 +27,26 @@ const shareDownload = document.getElementById('share-download');
 let currentData = null;
 let timerInterval = null;
 
+// Client-side length guardrails: very large documents risk the model
+// truncating its JSON response mid-stream (see parser.js guard).
+const MAX_CHARS = 60000;
+const WARN_CHARS = 20000;
+
 const { openTrapModal } = initModal();
 
+function prefersReducedMotion() {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
 // Event listeners
-scanBtn.addEventListener('click', startScan);
-sampleBtn.addEventListener('click', loadRandomSample);
+scanBtn.addEventListener('click', e => {
+  createRipple(e, scanBtn);
+  startScan();
+});
+sampleBtn.addEventListener('click', e => {
+  createRipple(e, sampleBtn);
+  loadRandomSample();
+});
 
 document.querySelectorAll('.chip[data-sample]').forEach(chip => {
   chip.addEventListener('click', () => {
@@ -121,6 +136,13 @@ async function startScan() {
     showToast('Text seems too short for a ToS. Please paste the full document.', 'error');
     return;
   }
+  if (text.length > MAX_CHARS) {
+    showToast(`Document is too long (${text.length.toLocaleString()} chars). Please trim it to under ${MAX_CHARS.toLocaleString()} characters and try again.`, 'error');
+    return;
+  }
+  if (text.length > WARN_CHARS) {
+    showToast(`Long document (${text.length.toLocaleString()} chars) — the analysis may take longer or get cut short. Trimming to the key sections helps.`, 'info');
+  }
 
   setLoading(true);
 
@@ -170,16 +192,51 @@ function stopTimer() {
 
 function showReport(data) {
   setLoading(false);
-  inputView.classList.remove('active');
-  reportView.classList.add('active');
-  window.scrollTo(0, 0);
-  renderReport(data, openTrapModal);
+  transitionViews(inputView, reportView, () => {
+    renderReport(data, openTrapModal);
+    window.scrollTo(0, 0);
+  });
 }
 
 function showInput() {
-  reportView.classList.remove('active');
-  inputView.classList.add('active');
-  window.scrollTo(0, 0);
+  transitionViews(reportView, inputView, () => {
+    window.scrollTo(0, 0);
+  });
+}
+
+// Crossfades the outgoing view out before swapping in the incoming one,
+// instead of an abrupt display:none/flex cut.
+function transitionViews(fromView, toView, onSwap) {
+  if (prefersReducedMotion()) {
+    fromView.classList.remove('active');
+    toView.classList.add('active');
+    if (onSwap) onSwap();
+    return;
+  }
+
+  fromView.classList.add('view-leaving');
+  window.setTimeout(() => {
+    fromView.classList.remove('active', 'view-leaving');
+    toView.classList.add('active');
+    if (onSwap) onSwap();
+  }, 220);
+}
+
+// Tactile ripple feedback on primary actions, from the click point outward.
+function createRipple(e, btn) {
+  if (prefersReducedMotion()) return;
+  const rect = btn.getBoundingClientRect();
+  const size = Math.max(rect.width, rect.height) * 2;
+  const x = (e.clientX ?? rect.left + rect.width / 2) - rect.left - size / 2;
+  const y = (e.clientY ?? rect.top + rect.height / 2) - rect.top - size / 2;
+
+  const ripple = document.createElement('span');
+  ripple.className = 'ripple';
+  ripple.style.width = ripple.style.height = `${size}px`;
+  ripple.style.left = `${x}px`;
+  ripple.style.top = `${y}px`;
+  ripple.addEventListener('animationend', () => ripple.remove());
+  btn.appendChild(ripple);
 }
 
 function loadRandomSample() {

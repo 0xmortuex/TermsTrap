@@ -17,6 +17,25 @@
   --font-display: 'Bricolage Grotesque', sans-serif;
   --font-body: 'Outfit', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
+
+  /* ===== Motion tokens ===== */
+  --motion-fast: 150ms;
+  --motion-base: 300ms;
+  --motion-slow: 500ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ===== Reduced motion ===== */
+/* Gate every non-essential animation/transition behind the OS preference.
+   State still changes instantly; only the motion is removed. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* ===== Reset ===== */
@@ -42,6 +61,53 @@ a { color: var(--accent); text-decoration: none; }
 /* ===== Views ===== */
 .view { display: none; }
 .view.active { display: flex; }
+
+/* Crossfade: outgoing view fades+lifts out before the incoming view swaps
+   in (which then plays its own existing entrance animation). */
+.view.view-leaving {
+  animation: viewFadeOut var(--motion-base) var(--ease-out) forwards;
+}
+
+@keyframes viewFadeOut {
+  to { opacity: 0; transform: translateY(-8px); }
+}
+
+/* ===== Focus & tactile feedback ===== */
+button:focus-visible,
+.btn:focus-visible,
+.fab:focus-visible,
+.chip:focus-visible,
+.filter-pill:focus-visible,
+#tos-input:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(244,63,94,0.35), 0 0 14px rgba(244,63,94,0.25);
+}
+
+.btn:active:not(:disabled), .chip:active, .filter-pill:active { transform: scale(0.97); }
+.fab:active { transform: scale(0.9); }
+
+/* Higher-specificity overrides so a press still reads as a press even
+   while the pointer is also hovering (hover transforms would otherwise win
+   on source order alone). */
+.btn:hover:active:not(:disabled) { transform: scale(0.97); }
+.fab:hover:active { transform: scale(0.9); }
+
+/* Ripple: expanding circle from the click point, transform+opacity only. */
+.btn { position: relative; overflow: hidden; }
+
+.ripple {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.35);
+  transform: scale(0);
+  opacity: 0.6;
+  pointer-events: none;
+  animation: rippleOut var(--motion-slow) var(--ease-out) forwards;
+}
+
+@keyframes rippleOut {
+  to { transform: scale(1); opacity: 0; }
+}
 
 /* ===== INPUT VIEW ===== */
 #input-view {

@@ -52,6 +52,21 @@ export function renderReport(data, onLearnMore) {
 
   document.getElementById('company-name').textContent = data.companyName;
   document.getElementById('doc-type-badge').textContent = data.documentType;
+
+  playTrapSnap(data.riskScore);
+}
+
+// Subtle "trap jaws snapping shut" flourish on the header icon when the
+// document turns out to be genuinely dangerous. Purely decorative, so it's
+// skipped entirely under prefers-reduced-motion.
+function playTrapSnap(riskScore) {
+  if (riskScore <= 75 || prefersReducedMotion()) return;
+  const icon = document.querySelector('#btn-back-logo .logo-icon-sm');
+  if (!icon) return;
+  icon.classList.remove('trap-snap');
+  // Force reflow so re-adding the class restarts the animation on repeat scans.
+  void icon.offsetWidth;
+  icon.classList.add('trap-snap');
 }
 
 function renderRiskHero(data) {
@@ -61,36 +76,80 @@ function renderRiskHero(data) {
   const readEl = document.getElementById('reading-time');
   const tldrEl = document.getElementById('tldr-text');
 
-  const color = getScoreColor(data.riskScore);
+  const finalColor = getScoreColor(data.riskScore);
   const circumference = 2 * Math.PI * 70;
   const offset = circumference - (data.riskScore / 100) * circumference;
 
-  ring.style.stroke = color;
   ring.classList.add('risk-ring-animate');
 
-  requestAnimationFrame(() => {
+  if (prefersReducedMotion()) {
+    ring.style.stroke = finalColor;
     ring.style.strokeDashoffset = offset;
-  });
-
-  animateNumber(scoreEl, data.riskScore, 1500);
+    scoreEl.textContent = data.riskScore;
+    scoreEl.style.color = finalColor;
+  } else {
+    // Gauge sweep: ring + number count up together, color shifting
+    // green -> red in step with the live value (not just the endpoint).
+    requestAnimationFrame(() => {
+      ring.style.strokeDashoffset = offset;
+    });
+    animateNumber(scoreEl, data.riskScore, 1500, value => {
+      const liveColor = interpolateRiskColor(value);
+      ring.style.stroke = liveColor;
+      scoreEl.style.color = liveColor;
+    });
+  }
 
   levelEl.textContent = data.riskLevel;
-  levelEl.style.color = color;
+  levelEl.style.color = finalColor;
   if (data.riskScore > 75) levelEl.classList.add('pulse');
 
   readEl.textContent = `Est. ${data.readingTime} to read the full document`;
   tldrEl.textContent = data.tldr;
 }
 
-function animateNumber(el, target, duration) {
+function animateNumber(el, target, duration, onTick) {
   const start = performance.now();
   function update(now) {
     const progress = Math.min((now - start) / duration, 1);
     const eased = 1 - Math.pow(1 - progress, 3);
-    el.textContent = Math.round(eased * target);
+    const value = Math.round(eased * target);
+    el.textContent = value;
+    if (onTick) onTick(value);
     if (progress < 1) requestAnimationFrame(update);
   }
   requestAnimationFrame(update);
+}
+
+// Continuous green -> amber -> red gradient used while the gauge sweeps up,
+// so the color reads as a live measurement rather than a snap at the end.
+const RISK_COLOR_STOPS = [
+  { pct: 0, rgb: [34, 197, 94] },
+  { pct: 30, rgb: [34, 197, 94] },
+  { pct: 50, rgb: [217, 119, 6] },
+  { pct: 75, rgb: [234, 88, 12] },
+  { pct: 100, rgb: [220, 38, 38] }
+];
+
+function interpolateRiskColor(score) {
+  const pct = Math.max(0, Math.min(100, score));
+  let lo = RISK_COLOR_STOPS[0];
+  let hi = RISK_COLOR_STOPS[RISK_COLOR_STOPS.length - 1];
+  for (let i = 0; i < RISK_COLOR_STOPS.length - 1; i++) {
+    if (pct >= RISK_COLOR_STOPS[i].pct && pct <= RISK_COLOR_STOPS[i + 1].pct) {
+      lo = RISK_COLOR_STOPS[i];
+      hi = RISK_COLOR_STOPS[i + 1];
+      break;
+    }
+  }
+  const range = hi.pct - lo.pct || 1;
+  const t = (pct - lo.pct) / range;
+  const rgb = lo.rgb.map((c, i) => Math.round(c + (hi.rgb[i] - c) * t));
+  return `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+}
+
+function prefersReducedMotion() {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
 function renderGrades(grades) {
@@ -105,12 +164,35 @@ function renderGrades(grades) {
 
   row.innerHTML = items.map((item, i) => {
     const grade = grades[item.key];
+    const pct = gradeToPercent(grade);
     return `
       <div class="grade-card grade-${grade}" style="animation-delay:${i * 100}ms">
         <div class="grade-circle">${grade}</div>
         <div class="grade-label">${item.label}</div>
+        <div class="grade-bar-track">
+          <div class="grade-bar-fill" data-pct="${pct}" style="transition-delay:${i * 80 + 350}ms"></div>
+        </div>
       </div>`;
   }).join('');
+
+  // Fill bars 0 -> value using a transform (not width) so it stays
+  // compositor-only. Set on the next frame so the 0-state actually paints
+  // first and the transition has something to animate from.
+  if (prefersReducedMotion()) {
+    row.querySelectorAll('.grade-bar-fill').forEach(bar => {
+      bar.style.transform = `scaleX(${bar.dataset.pct / 100})`;
+    });
+  } else {
+    requestAnimationFrame(() => {
+      row.querySelectorAll('.grade-bar-fill').forEach(bar => {
+        bar.style.transform = `scaleX(${bar.dataset.pct / 100})`;
+      });
+    });
+  }
+}
+
+function gradeToPercent(grade) {
+  return { A: 95, B: 80, C: 60, D: 40, F: 20 }[grade] ?? 60;
 }
 
 function renderTraps(traps, onLearnMore) {
@@ -133,7 +215,10 @@ function renderTraps(traps, onLearnMore) {
 
 function renderTrapCards(traps, onLearnMore) {
   const list = document.getElementById('traps-list');
-  list.innerHTML = traps.map((trap, i) => `
+  // Group visually by severity (critical first) so the stagger-in reads as
+  // clusters of risk rather than the model's original clause order.
+  const sorted = [...traps].sort((a, b) => severityOrder(a.severity) - severityOrder(b.severity) || a.id - b.id);
+  list.innerHTML = sorted.map((trap, i) => `
     <div class="trap-card severity-${trap.severity}" data-severity="${trap.severity}" data-category="${trap.category}" style="animation-delay:${i * 50}ms">
       <div class="trap-strip ${trap.severity}"></div>
       <div class="trap-body">
